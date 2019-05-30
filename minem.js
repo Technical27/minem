@@ -47,7 +47,7 @@ const defaultconfig = `{
   "javaArgs": []
 }`;
 
-cli.version('1.1.0', '-v, --version');
+cli.version('1.1.2', '-v, --version');
 cli.option('-d, --dir <path>', 'uses <path> to run commands');
 
 cli
