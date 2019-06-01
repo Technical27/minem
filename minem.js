@@ -26,9 +26,10 @@ const logger = winston.createLogger({
   })
 });
 
-const streamHash = (stream, hash = 'sha1') => {
+const fileHash = (path, hash) => {
   return new Promise((resolve, reject) => {
     const sum = crypto.createHash(hash);
+    const stream = fs.createReadStream(path);
     stream.on('data', chunk => sum.update(chunk));
     stream.on('error', e => reject(`Hash error: ${e}`));
     stream.on('end', () => resolve(sum.digest('hex')));
@@ -76,6 +77,7 @@ cli
     const config = JSON.parse(fs.readFileSync(path.join(dir, 'minem.json'), 'utf8'));
 
     if (!fs.existsSync(path.join(dir, config.serverDir))) fs.mkdirSync(path.join(dir, config.serverDir));
+    if (fs.existsSync(path.join(dir, config.serverDir, config.serverFile))) fs.unlinkSync(path.join(dir, config.serverDir, config.serverFile));
 
     fetch('https://launchermeta.mojang.com/mc/game/version_manifest.json')
       .then(x => x.json())
@@ -99,20 +101,26 @@ cli
 
             logger.log('info', `downloading minecraft server version ${version} as ${config.serverFile}`);
 
-            let file = fs.createWriteStream(path.join(dir, config.serverDir, config.serverFile));
             fetch(downloadlink)
               .then(x => {
+                const file = fs.createWriteStream(path.join(dir, config.serverDir, config.serverFile));
                 x.body.pipe(file);
-                streamHash(x.body, 'sha1')
-                  .then(hash => {
-                    const expectedHash = v.downloads.server.sha1;
-                    if (hash !== expectedHash) return logger.log('error', `expected server hash to equal ${expectedHash}, but got ${hash}`);
-                    logger.log('info', 'server hash verified');
-                  })
-                  .catch(e => {
-                    return logger.log('error', `unable to verify server hash: ${e}`);
-                  });
-                x.body.on('end', () => file.close());
+                x.body.on('end', () => {
+                  file.close();
+                  fileHash(path.join(dir, config.serverDir, config.serverFile), 'sha1')
+                    .then(hash => {
+                      const expectedHash = v.downloads.server.sha1;
+                      if (hash !== expectedHash) {
+                        logger.log('error', `expected server hash to equal ${expectedHash}, but got ${hash}`);
+                        return fs.unlinkSync(path.join(dir, config.serverDir, config.serverFile));
+                      }
+                      logger.log('info', 'server hash verified');
+                    })
+                    .catch(e => {
+                      logger.log('error', `unable to verify server hash: ${e}`);
+                      return fs.unlinkSync(path.join(dir, config.serverDir, config.serverFile));
+                    });
+                });
               })
               .catch(e => logger.log('error', `error while downloading minecraft server: ${e}`));
           })
@@ -152,20 +160,20 @@ cli
     const config = JSON.parse(fs.readFileSync(path.join(dir, 'minem.json'), 'utf8'));
     if (!fs.existsSync(path.join(dir, config.serverDir, 'server.properties'))) return logger.log('error', `no server.properties file was found at ${config.serverDir}, use 'minem start' to start the server to create server.properties`);
 
-    let line = '';
-    const serverProps = fs.readFileSync(path.join(dir, config.serverDir, 'server.properties'), 'utf8').trim().split(/\r?\n/g);
+    let line;
+    const serverProps = fs.readFileSync(path.join(dir, config.serverDir, 'server.properties'), 'utf8').trim().split(/\r?\n/);
     for (const prop of serverProps) {
       if (prop[0] === '#') continue;
-      const match = prop.match(/(?<setting>[0-9a-z-.]+)=(?<value>[0-9a-z ]+)?/i).groups;
-      if (match.setting === setting) {
+      const {groups} = prop.match(/(?<setting>[0-9a-z-.]+)=(?<value>[0-9a-z ]+)?/i);
+      if (groups.setting === setting) {
         if (options.list) {
-          if (match.value) return logger.log('info', `${setting} has the value: ${match.value}`);
+          if (groups.value) return logger.log('info', `${setting} has the value: ${groups.value}`);
           return logger.log('info', `${setting} has no value`);
         }
         else line = prop;
       }
     }
-    if (options.list || line === '') return logger.log('error', `unable to find setting ${setting} in server.properties`);
+    if (options.list || !line) return logger.log('error', `unable to find setting ${setting} in server.properties`);
 
     replace({
       files: path.join(dir, config.serverDir, 'server.properties'),
