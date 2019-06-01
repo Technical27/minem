@@ -131,13 +131,14 @@ cli
   .description('starts a minecraft server using config info from minem.json')
   .action(() => {
     if (!fs.existsSync('minem.json')) return logger.log('error', 'no minem.json was found, use \'minem init\' to create one');
-
     const config = JSON.parse(fs.readFileSync('minem.json', 'utf8'));
 
-    if (!fs.existsSync(path.join(config.serverDir, config.serverFile))) return logger.log('error', `${config.serverFile} wasn't found, use 'minem download latest' to download the latest version`); 
+    if (!fs.existsSync(path.join(config.serverDir, config.serverFile))) return logger.log('error', `${config.serverFile} wasn't found, use 'minem download latest' to download the latest version`);
 
     logger.log('info', 'starting server');
+
     const s = spawn('java', [`-Xmx${config.mem.max}`, `-Xms${config.mem.min}`, ...config.javaArgs, '-jar', config.serverFile, 'nogui', ...config.args], {cwd: config.serverDir});
+
     s.stdout.pipe(process.stdout);
     process.stdin.pipe(s.stdin);
     s.on('exit', c => {
@@ -153,10 +154,12 @@ cli
   .action((setting, value, options) => {
     if (!fs.existsSync('minem.json')) return logger.log('error', 'no minem.json was found in the current directory, use \'minem init\' to create one');
     const config = JSON.parse(fs.readFileSync('minem.json', 'utf8'));
+
     if (!fs.existsSync(path.join(config.serverDir, 'server.properties'))) return logger.log('error', `no server.properties file was found at ${config.serverDir}, use 'minem start' to start the server to create server.properties`);
 
     let line;
     const serverProps = fs.readFileSync(path.join(config.serverDir, 'server.properties'), 'utf8').trim().split(/\r?\n/);
+
     for (const prop of serverProps) {
       if (prop[0] === '#') continue;
       const {groups} = prop.match(/(?<setting>[0-9a-z-.]+)=(?<value>[0-9a-z ]+)?/i);
@@ -168,6 +171,7 @@ cli
         else line = prop;
       }
     }
+
     if (options.list || !line) return logger.log('error', `unable to find setting ${setting} in server.properties`);
 
     replace({
