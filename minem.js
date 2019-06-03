@@ -5,11 +5,10 @@ const winston = require('winston');
 const chalk = require('chalk');
 const fetch = require('node-fetch');
 const cli = require('commander');
-const replace = require('replace-in-file');
+const shell = require('shelljs');
 
 const fs = require('fs');
 const path = require('path');
-const {spawn} = require('child_process');
 const crypto = require('crypto');
 
 const logger = winston.createLogger({
@@ -55,13 +54,13 @@ cli
   .description('creates a minem.json at the current directory')
   .action(() => {
     logger.log('info', 'creating minem.json');
-    fs.writeFileSync('minem.json', defaultconfig);
+    new shell.ShellString(defaultconfig).to('minem.json');
 
     logger.log('info', 'creating server directory');
-    fs.mkdirSync('server');
+    shell.mkdir('server');
 
     logger.log('info', 'creating eula.txt');
-    fs.writeFileSync(path.join('server', 'eula.txt'), 'eula=true');
+    new shell.ShellString('eula=true').to(path.join('server', 'eula.txt'));
   });
 
 cli
@@ -71,10 +70,9 @@ cli
   .action(version => {
     if (!fs.existsSync('minem.json')) return logger.log('error', 'no minem.json was found in the current directory, use \'minem init\' to create one');
 
-    const config = JSON.parse(fs.readFileSync('minem.json', 'utf8'));
+    const config = JSON.parse(shell.cat('minem.json'));
 
-    if (!fs.existsSync(config.serverDir)) fs.mkdirSync(config.serverDir);
-    if (fs.existsSync(path.join(config.serverDir, config.serverFile))) fs.unlinkSync(path.join(config.serverDir, config.serverFile));
+    if (!fs.existsSync(config.serverDir)) shell.mkdir(config.serverDir);
 
     fetch('https://launchermeta.mojang.com/mc/game/version_manifest.json')
       .then(x => x.json())
@@ -87,7 +85,7 @@ cli
         let versionlink;
         for (const v of versions) if (v.id === version) versionlink = v.url;
 
-        if (!versionlink) return logger.log('error', 'unable to find minecraft server version');
+        if (!versionlink) return logger.log('error', 'unable to find minecraft version');
 
         fetch(versionlink)
           .then(x => x.json())
@@ -100,22 +98,25 @@ cli
 
             fetch(downloadlink)
               .then(x => {
-                const file = fs.createWriteStream(path.join(config.serverDir, config.serverFile));
+                const tmp = shell.tempdir().toString();
+                const file = fs.createWriteStream(path.join(tmp, 'server-tmp.jar'));
                 x.body.pipe(file);
                 x.body.on('end', () => {
                   file.close();
-                  fileHash(path.join(config.serverDir, config.serverFile), 'sha1')
+                  fileHash(path.join(tmp, 'server-tmp.jar'), 'sha1')
                     .then(hash => {
                       const expectedHash = v.downloads.server.sha1;
                       if (hash !== expectedHash) {
                         logger.log('error', `expected server hash to equal ${expectedHash}, but got ${hash}`);
-                        return fs.unlinkSync(path.join(config.serverDir, config.serverFile));
+                        return shell.rm(path.join(tmp, 'server-tmp.jar'));
                       }
                       logger.log('info', 'server hash verified');
+                      shell.cp(path.join(tmp, 'server-tmp.jar'), path.join(config.serverDir, config.serverFile));
+                      shell.rm(path.join(tmp, 'server-tmp.jar'));
                     })
                     .catch(e => {
                       logger.log('error', `unable to verify server hash: ${e}`);
-                      return fs.unlinkSync(path.join(config.serverDir, config.serverFile));
+                      return shell.rm(path.join(tmp, 'server-tmp.jar'));
                     });
                 });
               })
@@ -131,13 +132,17 @@ cli
   .description('starts a minecraft server using config info from minem.json')
   .action(() => {
     if (!fs.existsSync('minem.json')) return logger.log('error', 'no minem.json was found, use \'minem init\' to create one');
-    const config = JSON.parse(fs.readFileSync('minem.json', 'utf8'));
+    const config = JSON.parse(shell.cat('minem.json'));
 
     if (!fs.existsSync(path.join(config.serverDir, config.serverFile))) return logger.log('error', `${config.serverFile} wasn't found, use 'minem download latest' to download the latest version`);
 
+    const java = shell.which('java');
+
+    if (!java) return logger.log('error', 'java wasn\'t found on PATH, please make sure it is on PATH');
+
     logger.log('info', 'starting server');
 
-    const s = spawn('java', [`-Xmx${config.mem.max}`, `-Xms${config.mem.min}`, ...config.javaArgs, '-jar', config.serverFile, 'nogui', ...config.args], {cwd: config.serverDir});
+    const s = shell.exec(`${java} -Xmx${config.mem.max} -Xms${config.mem.min} ${config.javaArgs.join(' ')} -jar ${config.serverFile} nogui ${config.args.join(' ')}`, {async: true, cwd: config.serverDir});
 
     s.stdout.pipe(process.stdout);
     process.stdin.pipe(s.stdin);
@@ -153,32 +158,14 @@ cli
   .option('-l,--list', 'lists <setting>')
   .action((setting, value, options) => {
     if (!fs.existsSync('minem.json')) return logger.log('error', 'no minem.json was found in the current directory, use \'minem init\' to create one');
-    const config = JSON.parse(fs.readFileSync('minem.json', 'utf8'));
+    const config = JSON.parse(shell.cat('minem.json'));
+    if (!value) value = '';
 
-    if (!fs.existsSync(path.join(config.serverDir, 'server.properties'))) return logger.log('error', `no server.properties file was found at ${config.serverDir}, use 'minem start' to start the server to create server.properties`);
+    const [, v] = shell.cat(path.join(config.serverDir, 'server.properties')).grep(setting).replace(/\n/, '').split('=');
 
-    let line;
-    const serverProps = fs.readFileSync(path.join(config.serverDir, 'server.properties'), 'utf8').trim().split(/\r?\n/);
-
-    for (const prop of serverProps) {
-      if (prop[0] === '#') continue;
-      const {groups} = prop.match(/(?<setting>[0-9a-z-.]+)=(?<value>[0-9a-z ]+)?/i);
-      if (groups.setting === setting) {
-        if (options.list) {
-          if (groups.value) return logger.log('info', `${setting} has the value: ${groups.value}`);
-          return logger.log('info', `${setting} has no value`);
-        }
-        else line = prop;
-      }
-    }
-
-    if (options.list || !line) return logger.log('error', `unable to find setting ${setting} in server.properties`);
-
-    replace({
-      files: path.join(config.serverDir, 'server.properties'),
-      from: line,
-      to: `${setting}=${value}`
-    });
+    if (options.list) return logger.log('info', `setting ${setting} has the value '${v}'`);
+    shell.sed('-i', v, value, path.join(config.serverDir, 'server.properties'));
+    logger.log('info', `setting ${setting} now has value '${value}'`);
   });
 
 cli.parse(process.argv);
