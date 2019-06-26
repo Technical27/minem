@@ -39,13 +39,10 @@ const fileHash = (path, hash) => {
 const defaultconfig = `{
   "serverFile": "server.jar",
   "serverDir": "server",
-  "startFile": "start.js",
   "mem": {
     "min": "1G",
     "max": "2G"
-  },
-  "args": [],
-  "javaArgs": []
+  }
 }`;
 
 cli.version('1.1.2', '-v, --version');
@@ -143,7 +140,7 @@ cli
 
     logger.log('info', 'starting server');
 
-    const s = spawn(java, [`-Xmx${config.mem.max}`, `-Xms${config.mem.min}`, `${config.javaArgs.join(' ')}`, '-jar', `${config.serverFile}`, 'nogui', `${config.args.join(' ')}`], {cwd: config.serverDir});
+    const s = spawn('java', [`-Xmx${config.mem.max}`, `-Xms${config.mem.min}`, '-jar', `${config.serverFile}`, 'nogui'], {cwd: config.serverDir});
 
     s.stdout.pipe(process.stdout);
     process.stdin.pipe(s.stdin);
