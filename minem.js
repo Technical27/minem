@@ -142,7 +142,7 @@ cli
 
     logger.log('info', 'starting server');
 
-    const s = shell.exec(`${java} -Xmx${config.mem.max} -Xms${config.mem.min} ${config.javaArgs.join(' ')} -jar ${config.serverFile} nogui ${config.args.join(' ')}`, {async: true, cwd: config.serverDir});
+    const s = shell.exec(`'${java}' -Xmx${config.mem.max} -Xms${config.mem.min} ${config.javaArgs.join(' ')} -jar ${config.serverFile} nogui ${config.args.join(' ')}`, {async: true, cwd: config.serverDir});
 
     s.stdout.pipe(process.stdout);
     process.stdin.pipe(s.stdin);
