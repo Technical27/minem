@@ -6,6 +6,7 @@ const chalk = require('chalk');
 const fetch = require('node-fetch');
 const cli = require('commander');
 const shell = require('shelljs');
+const {spawn} = require('child_process');
 
 const fs = require('fs');
 const path = require('path');
@@ -142,7 +143,7 @@ cli
 
     logger.log('info', 'starting server');
 
-    const s = shell.exec(`'${java}' -Xmx${config.mem.max} -Xms${config.mem.min} ${config.javaArgs.join(' ')} -jar ${config.serverFile} nogui ${config.args.join(' ')}`, {async: true, cwd: config.serverDir});
+    const s = spawn(java, [`-Xmx${config.mem.max}`, `-Xms${config.mem.min}`, `${config.javaArgs.join(' ')}`, '-jar', `${config.serverFile}`, 'nogui', `${config.args.join(' ')}`], {cwd: config.serverDir});
 
     s.stdout.pipe(process.stdout);
     process.stdin.pipe(s.stdin);
