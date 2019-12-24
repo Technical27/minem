@@ -3,7 +3,7 @@
 
 const winston = require('winston');
 const chalk = require('chalk');
-const fetch = require('node-fetch');
+const axios = require('axios');
 const cli = require('commander');
 const shell = require('shelljs');
 const {spawn} = require('child_process');
@@ -72,7 +72,7 @@ cli
 
     if (!fs.existsSync(config.serverDir)) shell.mkdir(config.serverDir);
 
-    fetch('https://launchermeta.mojang.com/mc/game/version_manifest.json')
+    axios('https://launchermeta.mojang.com/mc/game/version_manifest.json')
       .then(x => x.json())
       .then(manifest => {
         const {versions} = manifest;
@@ -85,7 +85,7 @@ cli
 
         if (!versionlink) return logger.log('error', 'unable to find minecraft version');
 
-        fetch(versionlink)
+        axios(versionlink)
           .then(x => x.json())
           .then(v => {
             if (!v.downloads.server) return logger.log('error', `unable to find a server download for version ${version}`);
@@ -94,7 +94,7 @@ cli
 
             logger.log('info', `downloading minecraft server version ${version} as ${config.serverFile}`);
 
-            fetch(downloadlink)
+            axios(downloadlink)
               .then(x => {
                 const tmp = shell.tempdir().toString();
                 const file = fs.createWriteStream(path.join(tmp, 'server-tmp.jar'));
