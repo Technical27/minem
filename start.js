@@ -14,12 +14,13 @@ module.exports = logger => options => {
       }
 
       logger.log('info', 'starting server');
+      const args = [`-Xmx${config.mem.max}`, `-Xms${config.mem.min}`, '-jar', `${config.serverFile}`, 'nogui'];
       if (options.detach) {
-        const s = spawn('java', [`-Xmx${config.mem.max}`, `-Xms${config.mem.min}`, '-jar', `${config.serverFile}`, 'nogui'], {detached: true, cwd: config.serverDir, stdio: 'ignore'});
+        const s = spawn('java', args, {detached: true, cwd: config.serverDir, stdio: 'ignore'});
         s.unref();
       }
       else {
-        const s = spawn('java', [`-Xmx${config.mem.max}`, `-Xms${config.mem.min}`, '-jar', `${config.serverFile}`, 'nogui'], {cwd: config.serverDir});
+        const s = spawn('java', args, {cwd: config.serverDir});
         s.stdout.pipe(process.stdout);
         process.stdin.pipe(s.stdin);
         s.on('exit', c => {
@@ -27,5 +28,5 @@ module.exports = logger => options => {
           process.exit();
         });
       }
-  });
+    });
 };

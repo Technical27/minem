@@ -40,7 +40,7 @@ module.exports = logger => version => {
 
       if (!versionLink) return logger.log('error', 'unable to find minecraft version');
 
-      return axios(versionLink)
+      return axios(versionLink);
     })
     .then(({data: v}) => {
       if (!v.downloads.server) return logger.log('error', `unable to find a server download for version ${version}`);

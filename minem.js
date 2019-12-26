@@ -6,7 +6,6 @@ const chalk = require('chalk');
 const cli = require('commander');
 const Promise = require('bluebird');
 
-const {spawn} = require('child_process');
 const path = require('path');
 const fs = Promise.promisifyAll(require('fs'));
 
