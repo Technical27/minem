@@ -15,11 +15,11 @@ const logger = winston.createLogger({
   format: winston.format.printf(log => {
     switch (log.level) {
       case 'info':
-        return `${chalk.bgBlack.bold.yellow(log.level)}: ${log.message}`;
+        return chalk.bgBlack(`${chalk.bold.yellow(log.level)}: ${log.message}`);
       case 'error':
-        return `${chalk.bgBlack.bold.redBright(log.level)}: ${chalk.underline(log.message)}`;
+        return chalk.bgBlack(`${chalk.bold.redBright(log.level)}: ${chalk.underline(log.message)}`);
       default:
-        return `${log.level}: ${log.message}`;
+        return chalk.bgBlack(`${log.level}: ${log.message}`);
     }
   })
 });
@@ -63,7 +63,7 @@ cli
         const globalConfig = JSON.parse(file);
         if (!globalConfig.servers) globalConfig.servers = [];
 
-        const name = path.basename(process.cwd()); 
+        const name = path.basename(process.cwd());
         if (!globalConfig.servers.some(s => s.name === name)) {
           globalConfig.servers.push({name, path: process.cwd(), status: 'offline'});
           return fs.writeFileAsync(globalConfigPath, JSON.stringify(globalConfig));
@@ -83,5 +83,10 @@ cli
   .description('starts a minecraft server using config info from minem.json, use -d to run from background')
   .option('-d,--detach', 'runs server in background')
   .action(require('./start')(logger));
+
+cli
+  .command('server')
+  .description('manages a global list of servers')
+  .action(require('./server')(logger));
 
 cli.parse(process.argv);
