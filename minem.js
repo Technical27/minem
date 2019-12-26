@@ -79,9 +79,8 @@ cli
   .action(require('./download')(logger));
 
 cli
-  .command('start')
-  .description('starts a minecraft server using config info from minem.json, use -d to run from background')
-  .option('-d,--detach', 'runs server in background')
+  .command('start [name]')
+  .description('starts a minecraft server in the current directory or starts [name]')
   .action(require('./start')(logger));
 
 cli
