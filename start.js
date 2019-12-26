@@ -15,6 +15,7 @@ module.exports = logger => options => {
 
       logger.log('info', 'starting server');
       const args = [`-Xmx${config.mem.max}`, `-Xms${config.mem.min}`, '-jar', `${config.serverFile}`, 'nogui'];
+
       if (options.detach) {
         const s = spawn('java', args, {detached: true, cwd: config.serverDir, stdio: 'ignore'});
         s.unref();
